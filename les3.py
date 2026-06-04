@@ -23,3 +23,19 @@ def extract() -> pd.DataFrame:
     conn.close()
 
     return data
+
+import pandas as pd
+from airflow.providers.postgres.hooks.postgres import PostgresHook
+from airflow.decorators import task
+# ваш код здесь
+@task()
+def load(data: pd.DataFrame):
+    hook = PostgresHook('destination_db')
+    hook.insert_rows(
+        table="users_churn",
+        replace=True,
+        target_fields=data.columns.tolist(),
+        replace_index=['customer_id'],
+        rows=data.values.tolist()
+    )
+	# ваш код здесь #

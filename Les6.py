@@ -1,6 +1,5 @@
 # dags/churn.py
 import sqlalchemy
-from sqlalchemy import Table, MetaData, Column, Integer, String, DateTime, UniqueConstraint, Float, inspect
 import pandas as pd
 import numpy as np
 from airflow.providers.postgres.hooks.postgres import PostgresHook
@@ -15,13 +14,15 @@ from airflow.decorators import dag, task
     tags=["ETL"]
 )
 def prepare_churn_dataset():
-    # ваш код здесь #
-
     @task()
-    def create_table(db_conn: sqlalchemy.engine.base.Engine) -> None:
+    def create_table() -> None:
+        from sqlalchemy import Table, MetaData, Column, Integer, String, DateTime, UniqueConstraint, Float, inspect
+
+        hook = PostgresHook('source_db')
+        db_conn = hook.get_sqlalchemy_engine()
         metadata = MetaData()
         salaries_table = Table(
-            'users_churn',  # замените на имя вашей таблицы
+            'users_churn',
             metadata,
             Column('id', Integer, primary_key=True, autoincrement=True),
             Column('customer_id', String),
@@ -46,14 +47,11 @@ def prepare_churn_dataset():
             Column('multiple_lines', String),
             Column('target', Integer),
             UniqueConstraint('customer_id', name='unique_employee_constraint')
-
         )
         if not inspect(db_conn).has_table(salaries_table.name):
             metadata.create_all(db_conn)
 
-        # ваш код здесь #
-        @task()
-
+    @task()
     def extract(**kwargs):
         hook = PostgresHook('source_db')
         conn = hook.get_conn()
@@ -89,10 +87,11 @@ def prepare_churn_dataset():
             rows=data.values.tolist()
         )
 
-    create_table(sqlalchemy.engine.base.Engine)
+    # Вызов задач
+    create_table()
     data = extract()
+    transformed_data = transform(data)
+    load(transformed_data)
 
 
-transformed_data = transform(data)
-load(transformed_data)
 prepare_churn_dataset()
